@@ -1,0 +1,88 @@
+__global__ 
+void max(const unsigned int* const d_inputVals, unsigned int* d_out, const size_t numElems)
+{
+	int startIdx = (blockIdx.x * blockDim.x) << 1;
+	extern __shared__ unsigned int s_blkData[];
+	if (startIdx + threadIdx.x < numElems)
+		s_blkData[threadIdx.x] = d_inputVals[startIdx + threadIdx.x];
+	if (startIdx + threadIdx.x + blockDim.x < numElems)
+		s_blkData[threadIdx.x + blockDim.x] = d_inputVals[startIdx + threadIdx.x + blockDim.x];
+	__syncthreads();
+	
+	for (int stride = blockDim.x; stride > 0; stride >>= 1)
+	{
+		if (threadIdx.x < stride)
+		{
+			int i = startIdx + threadIdx.x;
+			if (i + stride < numElems)
+				s_blkData[threadIdx.x] = umax(s_blkData[threadIdx.x], s_blkData[threadIdx.x + stride]);
+			
+		}
+		__syncthreads();
+	}
+
+	if (0 == threadIdx.x)
+	{
+		d_out[blockIdx.x] = s_blkData[0];
+	}
+}	
+
+unsigned int host_max(const unsigned int * const d_inputVals, 
+						const size_t numElems, 
+						const dim3 blockSize)
+{
+	const dim3 gridSize((numElems - 1) / (blockSize.x * 2) + 1);
+	
+	unsigned int* d_out;
+	checkCudaErrors(cudaMalloc(&d_out, sizeof(unsigned int) * gridSize.x));
+	unsigned int* h_out = (unsigned int*) malloc(gridSize.x * sizeof(unsigned int));
+
+	
+	max<<<gridSize, blockSize, (blockSize.x * 2 * sizeof(unsigned int))>>>(d_inputVals, d_out, numElems);
+	cudaDeviceSynchronize(); checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaMemcpy(h_out, d_out, gridSize.x * sizeof(unsigned int), cudaMemcpyDeviceToHost));
+	
+	unsigned int uMax = h_out[0];
+	for (int i = 1; i < gridSize.x; ++i)
+	{
+		if (h_out[i] > uMax)
+			uMax = h_out[i];
+	}
+
+	checkCudaErrors(cudaFree(d_out));
+	free(h_out);
+	return uMax;
+}
+
+unsigned int getMaxNumOfBits_parallel(unsigned int* d_inputVals, const size_t numElems)
+{
+	const dim3 blockSize(128);
+	unsigned int maxElem = host_max(d_inputVals, numElems, blockSize);
+	printf("max = %d\n", maxElem);
+	unsigned int mask = 1 << 31;
+	unsigned int count = 0;
+	while (! (mask & maxElem)) 
+	{
+		++count;
+		mask >>= 1;
+	}
+	return MAX_INT_BITS - count;
+}
+
+unsigned int getMaxNumOfBits(unsigned int* d_inputVals, const size_t numElems)
+{
+	unsigned int* h_inputVals = (unsigned int*) malloc (sizeof(unsigned int) * numElems);
+	checkCudaErrors(cudaMemcpy(h_inputVals, d_inputVals, numElems * sizeof(unsigned int), cudaMemcpyDeviceToHost));
+	
+	unsigned int maxElem = *std::max_element(h_inputVals, h_inputVals + numElems);
+	printf("max = %d\n", maxElem);
+	unsigned int mask = 1 << 31;
+	unsigned int count = 0;
+	while (! (mask & maxElem)) 
+	{
+		++count;
+		mask >>= 1;
+	}
+	free(h_inputVals);
+	return MAX_INT_BITS - count;
+}
