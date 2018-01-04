@@ -1,0 +1,2 @@
+- Tách code thành các file riêng lẻ
+- Tối ưu exclusive scan (giảm từ 254 -> 202)
