@@ -3,8 +3,9 @@
 
 #include "CUDASupport.h"
 
-void host_scatter(unsigned int* const d_inputVals,
+void host_scatter(const unsigned int* const d_inputVals,
 				unsigned int* const d_outputVals,
+				const unsigned int* const d_index,
 				const size_t numElems,
 				const size_t numBins,
 				const unsigned int* const d_histScan,

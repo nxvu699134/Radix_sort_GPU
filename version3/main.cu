@@ -2,16 +2,41 @@
 
 #include "radixsort.cuh"
 
+#include <iostream>
+#include <fstream>
+using namespace std;
+
 #include <algorithm>
 #include <cstring> //memset
 #include <time.h>
 
-void printArray(unsigned int* const h_input, const size_t numElems)
- {
-	for (unsigned int i = 0; i < numElems; ++i)
-		printf("%d  ", h_input[i]);
-	printf("\n");
- }
+ofstream out;
+
+void printBits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i=size-1;i>=0;i--)
+    {
+        for (j=7;j>=0;j--)
+        {
+            byte = (b[i] >> j) & 1;
+            out << (int)byte;
+        }
+    }
+}
+
+void printArray(unsigned int* const h_input, const size_t numElems) {
+	out.open ("histogram.txt");
+	for (unsigned int i = 0; i < numElems; ++i) {
+		printBits(sizeof(unsigned int), &h_input[i]);
+		out << endl << endl;
+	}
+	out << endl;
+	out.close();
+}
 
 __device__
  void dev_printArray(unsigned int* const d_input, const size_t numElems)
@@ -24,9 +49,9 @@ __device__
 int main()
 {
 	// srand(time(NULL));
-	const dim3 blockSize(64);
+	const dim3 blockSize(256);
 	const size_t numElems = 10000000;
-	const unsigned int numBits = 3;
+	const unsigned int numBits = 2;
 
 	unsigned int* h_inputVals = (unsigned int*) malloc(sizeof(unsigned int) * numElems);
 	for (int i = 0; i < numElems; ++i)
@@ -34,7 +59,7 @@ int main()
 		h_inputVals[i] = rand() % 1000000000 + 1;
 	}
 	
-	// printArray(h_inputVals, numElems);
+	//printArray(h_inputVals, numElems);
 
 	unsigned int* d_inputVals;
 	checkCudaErrors(cudaMalloc(&d_inputVals, sizeof(unsigned int) * numElems));

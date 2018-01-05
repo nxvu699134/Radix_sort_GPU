@@ -3,6 +3,6 @@
 
 #include "CUDASupport.h"
 
-unsigned int* host_exclusive_scan(const unsigned int* const d_in, const size_t numElems, const dim3 blockSize);
+unsigned int* calc_exclusive_scan(const unsigned int* const d_in, const size_t numElems, const dim3 blockSize);
 
 #endif

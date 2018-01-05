@@ -3,7 +3,8 @@
 
 #include "CUDASupport.h"
 
-unsigned int* host_histogram(const unsigned int* const d_inputVals, 
+unsigned int* calc_histogram(const unsigned int* const d_inputVals,
+							unsigned int* const d_index,
 							const size_t numElems,
 							const size_t numBins,
 							const unsigned int mask,

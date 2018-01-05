@@ -70,9 +70,10 @@ __global__ void exclusive_scan(const unsigned int* const idata, unsigned int* co
 		odata[dataIdx2] = s_data[threadIdx.x + blockDim.x] + prevSum;
 }
 
-unsigned int* host_exclusive_scan(const unsigned int* const d_in, const size_t numElems, const dim3 blockSize)
+unsigned int* calc_exclusive_scan(const unsigned int* const d_in, const size_t numElems, const dim3 blockSize)
 {
 	reset_scan<<<1, 1>>>();
+	cudaDeviceSynchronize();
 
 	int sharedSize = 2 * blockSize.x * sizeof(unsigned int) + 1;
 	dim3 gridSize((numElems - 1) / (2*blockSize.x) + 1);

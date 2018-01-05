@@ -4,6 +4,7 @@
 #include "scatter.cuh"
 
 #include <algorithm>
+#include <time.h>
 
 #define MAX_INT_BITS	32
 
@@ -39,39 +40,36 @@ void radix_sort(unsigned int* h_inputVals,
 		maxBits += numBits;
 
 	// loop through digits
+	double duration[3] = { 0, 0, 0 };
 	for (unsigned int i = 0; i <= maxBits; i += numBits)
 	{
 		unsigned int mask = (numBins - 1) << i;
 
-		// printf("mask: %d\n", mask);
 		//histogram 
-		unsigned int* d_hist = host_histogram(pInVals, numElems, numBins, mask, i, blockSize);
-
-		// unsigned int* h_hist = (unsigned int*) malloc (sizeof(unsigned int) * numBins * gridSize.x);
-		// checkCudaErrors(cudaMemcpy(h_hist, d_hist, sizeof(unsigned int) * numBins * gridSize.x, cudaMemcpyDeviceToHost));
-		// printArray(h_hist, numBins * gridSize.x);
-		// free(h_hist);
+		unsigned int *d_index;
+		checkCudaErrors(cudaMalloc(&d_index, sizeof(unsigned int) * numElems));
+		clock_t begin = clock();
+		unsigned int* d_hist = calc_histogram(pInVals, d_index, numElems, numBins, mask, i, blockSize);
+		clock_t end = clock();
+		duration[0] += end - begin;
 
 		// exclusive scan hist
-		unsigned int* d_histScan = host_exclusive_scan(d_hist, numBins * gridSize.x, blockSize);
-
-		// unsigned int* h_histScan = (unsigned int*) malloc (sizeof(unsigned int) * numBins * gridSize.x);
-		// checkCudaErrors(cudaMemcpy(h_histScan, d_histScan, sizeof(unsigned int) * numBins * gridSize.x, cudaMemcpyDeviceToHost));
-		// printArray(h_histScan, numBins * gridSize.x);
-		// free(h_histScan);
+		begin = clock();
+		unsigned int* d_histScan = calc_exclusive_scan(d_hist, numBins * gridSize.x, blockSize);
+		end = clock();
+		duration[1] += end - begin;
 
 		//scatter
-		host_scatter(pInVals, pOutVals, numElems, numBins, d_histScan, mask, i, blockSize);
+		begin = clock();
+		host_scatter(pInVals, pOutVals, d_index, numElems, numBins, d_histScan, mask, i, blockSize);
+		end = clock();
+		duration[2] += end - begin;
 
 		std::swap(pInVals, pOutVals);
-		// unsigned int* h_result = (unsigned int*) malloc (sizeof(unsigned int) * numElems);
-		// checkCudaErrors(cudaMemcpy(h_result, d_inputVals, sizeof(unsigned int) * numElems, cudaMemcpyDeviceToHost));
-		// printArray(h_result, numElems);
-		// free(h_result);
-		// printf("\n\n\n");
 
 		checkCudaErrors(cudaFree(d_hist));
 		checkCudaErrors(cudaFree(d_histScan));
+		checkCudaErrors(cudaFree(d_index));
 		d_hist = NULL;
 		d_histScan = NULL;
 	}
@@ -79,6 +77,10 @@ void radix_sort(unsigned int* h_inputVals,
 	{
 		checkCudaErrors(cudaMemcpy(d_outputVals, d_inputVals, sizeof(unsigned int) * numElems, cudaMemcpyDeviceToDevice));
 	}
+
+	printf("Time histogram: %lf\n", duration[0]);
+	printf("Time exscan: %lf\n", duration[1]);
+	printf("Time scatter: %lf\n", duration[2]);
 }
 
 

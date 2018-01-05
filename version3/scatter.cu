@@ -1,7 +1,7 @@
 #include "scatter.cuh"
 
 __global__
-void scatter(unsigned int* const d_inputVals,
+void scatter1(unsigned int* const d_inputVals,
 			unsigned int* const d_outputVals,
 			const unsigned int* const d_histScan,
 			const size_t numElems,
@@ -40,8 +40,29 @@ void scatter(unsigned int* const d_inputVals,
 
 }
 
-void host_scatter(unsigned int* const d_inputVals,
+__global__
+void scatter(const unsigned int* const d_inputVals,
+			unsigned int* const d_outputVals,
+			const unsigned int* const d_index,
+			const unsigned int* const d_histScan,
+			const size_t numElems,
+			const size_t numBins,
+			const unsigned int mask,
+			const unsigned int digitOrder)
+{
+	unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= numElems) return;
+
+	unsigned int value = d_inputVals[idx];
+	unsigned int bin = (value & mask) >> digitOrder;
+	unsigned int rank = d_histScan[bin * gridDim.x + blockIdx.x] + d_index[idx];
+	d_outputVals[rank] = value;
+
+}
+
+void host_scatter(const unsigned int* const d_inputVals,
 				unsigned int* const d_outputVals,
+				const unsigned int* const d_index,
 				const size_t numElems,
 				const size_t numBins,
 				const unsigned int* const d_histScan,
@@ -50,7 +71,5 @@ void host_scatter(unsigned int* const d_inputVals,
 				const dim3 blockSize)
 {
 	const dim3 gridSize((numElems - 1) / blockSize.x + 1);
-
-	unsigned int sharedSize = blockSize.x * sizeof(unsigned int);
-	scatter<<<gridSize, blockSize, sharedSize>>> (d_inputVals, d_outputVals, d_histScan, numElems,numBins, mask, digitOrder);
+	scatter<<<gridSize, blockSize>>> (d_inputVals, d_outputVals, d_index, d_histScan, numElems,numBins, mask, digitOrder);
 }
